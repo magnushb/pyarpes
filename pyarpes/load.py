@@ -15,8 +15,30 @@ def infoThemis(fname):
     """
 
     with h5.File(fname,'r') as f:
+        columns = ['Name','Lens mode','Kinetic energy','Pass energy','Type','Comment']
+        name = list(f.keys())
+        lensmode = [] 
+        Ekin = [] 
+        Ep = [] 
+        comment = [] 
+        data_type = []
+
         for key in f.keys():
-            print(key,':',f[key].attrs['lensmode'],'\t: ',f[key].attrs['TITLE'])
+            lensmode.append(f[key].attrs['lensmode'])
+            Ekin.append(f[key].attrs['Kinetic Energy'])
+            Ep.append(f[key].attrs['Pass Energy'])
+            comment.append(f[key].attrs['TITLE'])
+            for dset in f[key]:
+                data_type.append(dset)
+
+
+        
+        
+        df = pd.DataFrame(np.array([name,lensmode,Ekin,Ep,data_type,comment]).transpose(),columns=columns)
+        df['Comment'] = df['Comment'].str.replace('\n','; ')
+        pd.set_option('display.max_colwidth',None)
+
+    return df
 
 
 
@@ -55,21 +77,24 @@ def loadThemis(fname,dataset,**kwargs):
     with h5.File(fname,'r') as f:
         
         # Determine the type of the data: single events or converted data
-        data_type = 'events'
-        data = np.array(f.get('{}/{}'.format(dataset,data_type)))
-        if data.size <= 1:
-            data_type = 'conversion'
-            data = np.array(f.get('{}/{}'.format(dataset,data_type)))
+        for dset in f[dataset]:
+            data_type = dset
+        
+        #data = np.array(f.get('{}/{}'.format(dataset,data_type)))
+        #if data.size <= 1:
+        #    data_type = 'conversion'
+        #    data = np.array(f.get('{}/{}'.format(dataset,data_type)))
             
 
         if data_type == 'events':
             tfactor = f[dataset][data_type].attrs['FIELD_2_FACTOR']
             toffset = f[dataset][data_type].attrs['FIELD_2_OFFSET']
-            single_events = np.array(f.get('{}/{}'.format(dataset,data_type)))
-            df_data = pd.DataFrame(single_events)
+            data = np.array(f.get('{}/{}'.format(dataset,data_type)))
+            df_data = pd.DataFrame(data)
             time = np.array(df_data['time'])*tfactor-toffset
             c,t = np.histogram(time,bins)
         else: # the data is converted
+            data = np.array(f.get('{}/{}'.format(dataset,data_type)))
             # Get attributes for selected dataset
             min_energy=f[dataset][data_type].attrs['minimumenergy']
             max_energy=f[dataset][data_type].attrs['maximumenergy']
