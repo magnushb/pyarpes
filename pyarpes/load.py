@@ -92,6 +92,7 @@ def loadThemis(fname,dataset,**kwargs):
             data = np.array(f.get('{}/{}'.format(dataset,data_type)))
             df_data = pd.DataFrame(data)
             time = np.array(df_data['time'])*tfactor-toffset
+            bins = 500
             c,t = np.histogram(time,bins)
         else: # the data is converted
             data = np.array(f.get('{}/{}'.format(dataset,data_type)))
