@@ -8,7 +8,8 @@ from scipy.constants import pi
 
 def infoThemis(fname):
     """
-    Exracting metadata from a data file from the Themis at KTH.
+    Exracting metadata from a data file from the laser-based ARPES setup at KTH.
+    [M. H. Berntsen,Berntsen, O. Götberg, O. Tjernberg, Rev. Sci. Instrum. 82, 095113 (2011)]
 
     Input:
             fname = filename of file, including path
@@ -59,16 +60,16 @@ def loadThemis(fname,dataset,**kwargs):
 
     Output: 
             (Single Events):
-                x = DLD pixel x-position of electron event
-                y = DLD pixel y-position of electron event
-                t = detection time of electron event (flight time relative t_0)
+                xscale = DLD pixel x-position of electron event
+                yscale = DLD pixel y-position of electron event
+                tEscale = detection time of electron event (flight time relative t_0)
 
             (Converted):
-                anglex  = x-coordinate for electron event on detector in angle
-                angley  = y-coordinate for electron event on detector in angle
-                Ek      = kinetic energy of electron event
+                xscale  = x-coordinate for electron event on detector in degrees (anglex)
+                yscale  = y-coordinate for electron event on detector in degrees (angley)
+                tEscale = kinetic energy of electron event (in eV)
 
-    Usage: ax,ay,Ek = loadThemis()
+    Usage: xscale,yscale,Ek (or t) = loadThemis()
 
     """
     # Check if the selected dataset is SingleEvents or Converted
@@ -87,13 +88,31 @@ def loadThemis(fname,dataset,**kwargs):
             
 
         if data_type == 'events':
+            # Use standard binning if bins is not defined
+            try:
+                bins = kwargs['bins']
+            except NameError:
+                bins = (1024,1024,500)
+    
             tfactor = f[dataset][data_type].attrs['FIELD_2_FACTOR']
             toffset = f[dataset][data_type].attrs['FIELD_2_OFFSET']
             data = np.array(f.get('{}/{}'.format(dataset,data_type)))
             df_data = pd.DataFrame(data)
             time = np.array(df_data['time'])*tfactor-toffset
-            bins = 500
-            c,t = np.histogram(time,bins)
+            xscale = np.array(df_data.x)
+            yscale = np.array(df_data.y)
+            df_data_short = df_data.sample(20000)  # trying to bin all data crashes the kernel... out of memory? Therefore, load only part of data...
+
+            # Get bin edges for binning in time
+            #tmp,binedges = np.histogram(time,bins[2])
+            # Get bin edges for binning in 
+            H, edges = np.histogramdd(np.array(df_data_short),bins)
+
+            #xscale = np.array(df_data.x)
+            #yscale = np.array(df_data.y)
+            
+            #data,tE = np.histogram(time,bins[2])
+            #tE = tE[:-1] + np.diff(tE)/2
         else: # the data is converted
             data = np.array(f.get('{}/{}'.format(dataset,data_type)))
             # Get attributes for selected dataset
@@ -101,10 +120,9 @@ def loadThemis(fname,dataset,**kwargs):
             max_energy=f[dataset][data_type].attrs['maximumenergy']
             max_angle=f[dataset][data_type].attrs['maximumangle']
             # Create axis vectors
-            anglex=np.linspace(-(max_angle/pi*180),(max_angle/pi*180),data.shape[0])
-            angley=np.linspace(-(max_angle/pi*180),(max_angle/pi*180),data.shape[1])
-            energy=np.linspace(min_energy,max_energy,data.shape[2])
+            xscale=np.linspace(-(max_angle/pi*180),(max_angle/pi*180),data.shape[0])
+            yscale=np.linspace(-(max_angle/pi*180),(max_angle/pi*180),data.shape[1])
+            tE=np.linspace(min_energy,max_energy,data.shape[2])
             
    
-    
-    return anglex,angley,energy,data
+    return H, edges #xscale,yscale,tE,data
